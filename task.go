@@ -5,60 +5,79 @@ import (
 	"fmt"
 )
 
-type AdditionTask struct {
-	arg1 int
-	op   string
-	arg2 int
+type additionTask struct {
+	arg1   int
+	op     string
+	arg2   int
+	result int
 }
 
-type MultiplicationTask struct {
-	arg1 int
-	op   string
-	arg2 int
+type multiplicationTask struct {
+	arg1   int
+	op     string
+	arg2   int
+	result int
 }
 
-type SubtractionTask struct {
-	arg1 int
-	op   string
-	arg2 int
+type subtractionTask struct {
+	arg1   int
+	op     string
+	arg2   int
+	result int
 }
 
-type Task interface {
-	solve() int
+type task interface {
+	solve() task
+	getResult() int
 }
 
-func (t AdditionTask) solve() int {
-	return t.arg1 + t.arg2
+func (t additionTask) solve() task {
+	t.result = t.arg1 + t.arg2
+	return t
 }
 
-func (t MultiplicationTask) solve() int {
-	return t.arg1 * t.arg2
+func (t multiplicationTask) solve() task {
+	t.result = t.arg1 * t.arg2
+	return t
 }
 
-func (t SubtractionTask) solve() int {
-	return t.arg1 - t.arg2
+func (t subtractionTask) solve() task {
+	t.result = t.arg1 - t.arg2
+	return t
+}
+
+func (t additionTask) getResult() int {
+	return t.result
+}
+
+func (t multiplicationTask) getResult() int {
+	return t.result
+}
+
+func (t subtractionTask) getResult() int {
+	return t.result
 }
 
 type getTaskOp struct {
-	response chan Task
+	response chan taskMachineAdapter
 }
 
-func taskAddFilter(addChan chan Task, taskList []Task) chan Task {
+func taskAddFilter(addChan chan taskMachineAdapter, taskList []taskMachineAdapter) chan taskMachineAdapter {
 	if len(taskList) < cap(taskList) {
 		return addChan
 	}
 	return nil
 }
 
-func taskGetFilter(getChan chan *getTaskOp, taskList []Task) chan *getTaskOp {
+func taskGetFilter(getChan chan *getTaskOp, taskList []taskMachineAdapter) chan *getTaskOp {
 	if len(taskList) > 0 {
 		return getChan
 	}
 	return nil
 }
 
-func taskListServer(taskAddChan chan Task, taskGetChan chan *getTaskOp, infoChan chan bool) {
-	var taskList = make([]Task, 0, companyConstants.SizeOfTaskList)
+func taskListServer(taskAddChan chan taskMachineAdapter, taskGetChan chan *getTaskOp, infoChan chan bool) {
+	var taskList = make([]taskMachineAdapter, 0, companyConstants.SizeOfTaskList)
 
 	for {
 		select {
@@ -69,15 +88,16 @@ func taskListServer(taskAddChan chan Task, taskGetChan chan *getTaskOp, infoChan
 			taskList = append(taskList[:0], taskList[1:]...)
 		case <-infoChan:
 			displayTaskList(taskList)
+			infoChan <- true
 		}
 	}
 }
 
-func displayTaskList(taskList []Task) {
+func displayTaskList(taskList []taskMachineAdapter) {
 	fmt.Println()
-	fmt.Println("Task list:")
+	fmt.Println("task list:")
 	for _, task := range taskList {
-		fmt.Println(task)
+		fmt.Println(task.getTask())
 	}
 	fmt.Println()
 }

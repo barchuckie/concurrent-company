@@ -7,57 +7,141 @@ import (
 	"time"
 )
 
-func executiveOfficer(taskAddChan chan Task, isInteractive bool) {
+func executiveOfficer(taskAddChan chan taskMachineAdapter, isInteractive bool,
+	multiplicationMachines []multiplicationMachine, additionMachines []additionMachine) {
+
 	sleepTime := time.Duration(companyConstants.CEORate) * time.Second
+	x := 0
 
 	for {
 		time.Sleep(sleepTime)
 
-		n := rand.Intn(3)
+		n := rand.Intn(2)
 		arg1 := rand.Intn(100000)
 		arg2 := rand.Intn(100000)
+		x++
 
-		var task Task
+		var task taskMachineAdapter
 
 		switch n {
 		case 0:
-			task = AdditionTask{arg1, "+", arg2}
-		case 1:
-			task = SubtractionTask{arg1, "-", arg2}
+			task = additionAdapter{
+				additionTask{arg1, "+", arg2, 0},
+				additionMachines,
+			}
 		default:
-			task = MultiplicationTask{arg1, "*", arg2}
+			task = multiplicationAdapter{
+				multiplicationTask{arg1, "*", arg2, 0},
+				multiplicationMachines,
+			}
 		}
-
-		taskAddChan <- task
 
 		if !isInteractive {
 			fmt.Println("CEO adds new task:", task)
 		}
+
+		taskAddChan <- task
 	}
 }
 
-func worker(taskGetChan chan *getTaskOp, productAddChan chan int, isInteractive bool) {
+func worker(id int, taskGetChan chan *getTaskOp, productAddChan chan int, infoChan chan int, isInteractive bool) {
+
 	sleepTime := time.Duration(companyConstants.WorkerRate) * time.Second
+	var isPatient bool
+	var solvedTaskCounter = 0
+	var solvedTask task
+
+	if rand.Intn(2) == 1 {
+		isPatient = true
+	} else {
+		isPatient = false
+	}
+
+	go func() {
+		for {
+			reqId := <-infoChan
+			if reqId == id {
+				printWorkerStatistics(id, isPatient, solvedTaskCounter)
+			} else {
+				infoChan <- reqId
+			}
+			infoChan <- reqId
+		}
+	}()
+
 	for {
 		time.Sleep(sleepTime)
 
 		newTaskChan := &getTaskOp{
-			response: make(chan Task),
+			response: make(chan taskMachineAdapter),
 		}
 		taskGetChan <- newTaskChan
 		newTask := <-newTaskChan.response
-		product := newTask.solve()
 
 		if !isInteractive {
-			fmt.Println("Worker creates product:", product)
+			fmt.Println("Worker #", id, "gets task", newTask.getTask())
+		}
+
+		machine := newTask.getRandMachine()
+		insertTaskChan := machine.getTaskInsertChan()
+		machineAccessChan := make(chan bool)
+		machineSolveChan := make(chan task)
+		ito := &insertTaskOp{
+			newTask.getTask(),
+			machineSolveChan,
+			machineAccessChan,
+		}
+
+		insertTaskChan <- ito
+
+		if isPatient {
+			<-machineAccessChan
+			solvedTask = <-machineSolveChan
+		} else {
+			solved := false
+			for {
+				if solved {
+					break
+				}
+				select {
+				case <-machineAccessChan:
+					solvedTask = <-machineSolveChan
+					solved = true
+				case <-time.After(companyConstants.ImpatientWorkerWaitTime * time.Second):
+					machine = newTask.getRandMachine()
+					insertTaskChan = machine.getTaskInsertChan()
+					machineAccessChan = make(chan bool)
+					machineSolveChan = make(chan task)
+					ito = &insertTaskOp{
+						newTask.getTask(),
+						machineSolveChan,
+						machineAccessChan,
+					}
+				}
+			}
+		}
+
+		solvedTaskCounter++
+		product := solvedTask.getResult()
+
+		if !isInteractive {
+			fmt.Println("Worker #", id, "creates product:", product)
 		}
 
 		productAddChan <- product
 
 		if !isInteractive {
-			fmt.Println("Worker puts product:", product, "in magazine")
+			fmt.Println("Worker #", id, "puts product:", product, "in magazine")
 		}
 	}
+}
+
+func printWorkerStatistics(workerId int, isPatient bool, solvedTaskCount int) {
+	fmt.Println()
+	fmt.Println("Worker #", workerId)
+	fmt.Println("Patient: ", isPatient)
+	fmt.Println("# of solved task: ", solvedTaskCount)
+	fmt.Println()
 }
 
 func customer(productBuyChan chan *buyProductOp, isInteractive bool) {

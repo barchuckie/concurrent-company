@@ -9,11 +9,6 @@ type buyProductOp struct {
 	product chan int
 }
 
-type putProductOp struct {
-	product  int
-	response chan bool
-}
-
 func productAddFilter(addChan chan int, products []int) chan int {
 	if len(products) < cap(products) {
 		return addChan
@@ -40,6 +35,7 @@ func magazineServer(productPutChan chan int, productBuyChan chan *buyProductOp, 
 			products = products[:len(products)-1]
 		case <-infoChan:
 			displayMagazine(products)
+			infoChan <- true
 		}
 	}
 }
