@@ -23,7 +23,6 @@ type additionMachine struct {
 type insertTaskOp struct {
 	task       task
 	solvedChan chan task
-	accessChan chan bool
 }
 
 func (machine multiplicationMachine) getTaskInsertChan() chan *insertTaskOp {
@@ -35,7 +34,6 @@ func (machine multiplicationMachine) run() {
 
 	for {
 		insertedTask := <-machine.taskInsertChan
-		insertedTask.accessChan <- true
 		time.Sleep(sleepTime)
 		insertedTask.task = insertedTask.task.solve()
 		insertedTask.solvedChan <- insertedTask.task
@@ -51,7 +49,6 @@ func (machine additionMachine) run() {
 
 	for {
 		insertedTask := <-machine.taskInsertChan
-		insertedTask.accessChan <- true
 		time.Sleep(sleepTime)
 		insertedTask.task = insertedTask.task.solve()
 		insertedTask.solvedChan <- insertedTask.task

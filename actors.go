@@ -84,18 +84,14 @@ func worker(id int, taskGetChan chan *getTaskOp, productAddChan chan int, infoCh
 
 		machine := newTask.getRandMachine()
 		insertTaskChan := machine.getTaskInsertChan()
-		machineAccessChan := make(chan bool)
 		machineSolveChan := make(chan task)
 		ito := &insertTaskOp{
 			newTask.getTask(),
 			machineSolveChan,
-			machineAccessChan,
 		}
 
-		insertTaskChan <- ito
-
 		if isPatient {
-			<-machineAccessChan
+			insertTaskChan <- ito
 			solvedTask = <-machineSolveChan
 		} else {
 			solved := false
@@ -104,18 +100,16 @@ func worker(id int, taskGetChan chan *getTaskOp, productAddChan chan int, infoCh
 					break
 				}
 				select {
-				case <-machineAccessChan:
+				case insertTaskChan <- ito:
 					solvedTask = <-machineSolveChan
 					solved = true
 				case <-time.After(companyConstants.ImpatientWorkerWaitTime * time.Second):
 					machine = newTask.getRandMachine()
 					insertTaskChan = machine.getTaskInsertChan()
-					machineAccessChan = make(chan bool)
 					machineSolveChan = make(chan task)
 					ito = &insertTaskOp{
 						newTask.getTask(),
 						machineSolveChan,
-						machineAccessChan,
 					}
 				}
 			}
