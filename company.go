@@ -18,26 +18,7 @@ func main() {
 		isInteractive = false
 	}
 
-	multiplicationMachines := make([]multiplicationMachine, 0, companyConstants.MultiplicationMachinesCount)
-	additionMachines := make([]additionMachine, 0, companyConstants.AdditionMachinesCount)
-
-	for i := 0; i < companyConstants.MultiplicationMachinesCount; i++ {
-		machine := multiplicationMachine{
-			id:             i,
-			taskInsertChan: make(chan *insertTaskOp),
-		}
-		multiplicationMachines = append(multiplicationMachines, machine)
-		go machine.run()
-	}
-
-	for i := 0; i < companyConstants.AdditionMachinesCount; i++ {
-		machine := additionMachine{
-			id:             i,
-			taskInsertChan: make(chan *insertTaskOp),
-		}
-		additionMachines = append(additionMachines, machine)
-		go machine.run()
-	}
+	additionMachines, multiplicationMachines := createMachines()
 
 	taskAddChan := make(chan taskMachineAdapter)
 	taskGetChan := make(chan *getTaskOp)
@@ -47,6 +28,23 @@ func main() {
 	productBuyChan := make(chan *buyProductOp)
 	magazineInfoChan := make(chan bool)
 
+	brokenMachinesChan := make(chan int)
+	repairedMachinesChan := make(chan int)
+	machines := make([]machine, 0, companyConstants.AdditionMachinesCount+companyConstants.MultiplicationMachinesCount)
+
+	for i := range additionMachines {
+		machines = append(machines, additionMachines[i])
+	}
+	for i := range multiplicationMachines {
+		machines = append(machines, multiplicationMachines[i])
+	}
+
+	serviceWorkers := createServiceWorkers()
+	for i := range serviceWorkers {
+		go serviceWorkers[i].work(machines, repairedMachinesChan, isInteractive)
+	}
+	go service(brokenMachinesChan, repairedMachinesChan, serviceWorkers, isInteractive)
+
 	workersInfoChan := make([]chan int, 0, companyConstants.WorkersCount)
 
 	done := make(chan bool, 1)
@@ -54,7 +52,7 @@ func main() {
 	for i := 0; i < companyConstants.WorkersCount; i++ {
 		workerInfoChan := make(chan int)
 		workersInfoChan = append(workersInfoChan, workerInfoChan)
-		go worker(i, taskGetChan, productPutChan, workerInfoChan, isInteractive)
+		go worker(i, taskGetChan, productPutChan, brokenMachinesChan, workerInfoChan, isInteractive)
 	}
 
 	if isInteractive {

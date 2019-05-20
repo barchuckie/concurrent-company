@@ -26,25 +26,27 @@ func executiveOfficer(taskAddChan chan taskMachineAdapter, isInteractive bool,
 		switch n {
 		case 0:
 			task = additionAdapter{
-				additionTask{arg1, "+", arg2, 0},
+				additionTask{arg1, "+", arg2, nil},
 				additionMachines,
 			}
 		default:
 			task = multiplicationAdapter{
-				multiplicationTask{arg1, "*", arg2, 0},
+				multiplicationTask{arg1, "*", arg2, nil},
 				multiplicationMachines,
 			}
 		}
 
 		if !isInteractive {
-			fmt.Println("CEO adds new task:", task)
+			fmt.Print("CEO adds new task: ")
+			task.getTask().print()
 		}
 
 		taskAddChan <- task
 	}
 }
 
-func worker(id int, taskGetChan chan *getTaskOp, productAddChan chan int, infoChan chan int, isInteractive bool) {
+func worker(id int, taskGetChan chan *getTaskOp, productPutChan chan int, brokenMachineChan chan int,
+	infoChan chan int, isInteractive bool) {
 
 	sleepTime := time.Duration(companyConstants.WorkerRate) * time.Second
 	var isPatient bool
@@ -72,6 +74,7 @@ func worker(id int, taskGetChan chan *getTaskOp, productAddChan chan int, infoCh
 	for {
 		time.Sleep(sleepTime)
 
+		/* Getting task from task list */
 		newTaskChan := &getTaskOp{
 			response: make(chan taskMachineAdapter),
 		}
@@ -79,8 +82,11 @@ func worker(id int, taskGetChan chan *getTaskOp, productAddChan chan int, infoCh
 		newTask := <-newTaskChan.response
 
 		if !isInteractive {
-			fmt.Println("Worker #", id, "gets task", newTask.getTask())
+			fmt.Print("Worker #", id, " gets task: ")
+			newTask.getTask().print()
 		}
+
+		/* Inserting task into machine */
 
 		machine := newTask.getRandMachine()
 		insertTaskChan := machine.getTaskInsertChan()
@@ -90,39 +96,54 @@ func worker(id int, taskGetChan chan *getTaskOp, productAddChan chan int, infoCh
 			machineSolveChan,
 		}
 
+		solved := false
 		if isPatient {
-			insertTaskChan <- ito
-			solvedTask = <-machineSolveChan
-		} else {
-			solved := false
-			for {
-				if solved {
-					break
+			for !solved {
+				insertTaskChan <- ito
+				solvedTask = <-machineSolveChan
+				if solvedTask.getResult() == nil {
+					if !isInteractive {
+						fmt.Println("Worker #", id, "reports broken machine #", machine.getId(), "to service")
+					}
+					brokenMachineChan <- machine.getId()
+					machine = newTask.getRandMachine()
+					insertTaskChan = machine.getTaskInsertChan()
+				} else {
+					solved = true
 				}
+			}
+		} else {
+			for !solved {
 				select {
 				case insertTaskChan <- ito:
 					solvedTask = <-machineSolveChan
-					solved = true
+					if solvedTask.getResult() == nil {
+						if !isInteractive {
+							fmt.Println("Worker #", id, "reports broken machine #", machine.getId(), "to service")
+						}
+						brokenMachineChan <- machine.getId()
+						machine = newTask.getRandMachine()
+						insertTaskChan = machine.getTaskInsertChan()
+					} else {
+						solved = true
+					}
 				case <-time.After(companyConstants.ImpatientWorkerWaitTime * time.Second):
 					machine = newTask.getRandMachine()
 					insertTaskChan = machine.getTaskInsertChan()
-					machineSolveChan = make(chan task)
-					ito = &insertTaskOp{
-						newTask.getTask(),
-						machineSolveChan,
-					}
 				}
 			}
 		}
 
+		/* Creating product */
+
 		solvedTaskCounter++
-		product := solvedTask.getResult()
+		product := *solvedTask.getResult()
 
 		if !isInteractive {
 			fmt.Println("Worker #", id, "creates product:", product)
 		}
 
-		productAddChan <- product
+		productPutChan <- product
 
 		if !isInteractive {
 			fmt.Println("Worker #", id, "puts product:", product, "in magazine")

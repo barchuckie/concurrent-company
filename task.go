@@ -5,57 +5,85 @@ import (
 	"fmt"
 )
 
+type task interface {
+	solve(isBroken bool) task
+	getResult() *int
+	print()
+}
+
 type additionTask struct {
 	arg1   int
 	op     string
 	arg2   int
-	result int
+	result *int
+}
+
+func (t additionTask) solve(isBroken bool) task {
+	if isBroken {
+		t.result = nil
+	} else {
+		t.result = new(int)
+		*t.result = t.arg1 + t.arg2
+	}
+	return t
+}
+
+func (t additionTask) getResult() *int {
+	return t.result
+}
+
+func (t additionTask) print() {
+	fmt.Println(t.arg1, t.op, t.arg2)
 }
 
 type multiplicationTask struct {
 	arg1   int
 	op     string
 	arg2   int
-	result int
+	result *int
+}
+
+func (t multiplicationTask) solve(isBroken bool) task {
+	if isBroken {
+		t.result = nil
+	} else {
+		t.result = new(int)
+		*t.result = t.arg1 * t.arg2
+	}
+	return t
+}
+
+func (t multiplicationTask) getResult() *int {
+	return t.result
+}
+
+func (t multiplicationTask) print() {
+	fmt.Println(t.arg1, t.op, t.arg2)
 }
 
 type subtractionTask struct {
 	arg1   int
 	op     string
 	arg2   int
-	result int
+	result *int
 }
 
-type task interface {
-	solve() task
-	getResult() int
-}
-
-func (t additionTask) solve() task {
-	t.result = t.arg1 + t.arg2
+func (t subtractionTask) solve(isBroken bool) task {
+	if isBroken {
+		t.result = nil
+	} else {
+		t.result = new(int)
+		*t.result = t.arg1 - t.arg2
+	}
 	return t
 }
 
-func (t multiplicationTask) solve() task {
-	t.result = t.arg1 * t.arg2
-	return t
-}
-
-func (t subtractionTask) solve() task {
-	t.result = t.arg1 - t.arg2
-	return t
-}
-
-func (t additionTask) getResult() int {
+func (t subtractionTask) getResult() *int {
 	return t.result
 }
 
-func (t multiplicationTask) getResult() int {
-	return t.result
-}
-
-func (t subtractionTask) getResult() int {
-	return t.result
+func (t subtractionTask) print() {
+	fmt.Println(t.arg1, t.op, t.arg2)
 }
 
 type getTaskOp struct {
