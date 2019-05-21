@@ -2,7 +2,6 @@ package main
 
 import (
 	"company/companyConstants"
-	"fmt"
 	"math/rand"
 	"time"
 )
@@ -45,22 +44,18 @@ func (machine additionMachine) run() {
 	sleepTime := time.Duration(companyConstants.AdditionTime) * time.Second
 	isBroken := false
 
-	go func() {
-		if !isBroken {
-			if rand.Float32() > companyConstants.MachineReliability {
-				isBroken = true
-			}
-		}
-	}()
-
 	for {
 		select {
 		case insertedTask := <-machine.taskInsertChan:
 			time.Sleep(sleepTime)
+			if !isBroken {
+				if rand.Float32() > companyConstants.MachineReliability {
+					isBroken = true
+				}
+			}
 			insertedTask.task = insertedTask.task.solve(isBroken)
 			insertedTask.solvedChan <- insertedTask.task
 		case <-machine.backDoor:
-			fmt.Println("Machine #", machine.id, "is being repaired")
 			isBroken = false
 		}
 	}
@@ -92,22 +87,18 @@ func (machine multiplicationMachine) run() {
 	sleepTime := time.Duration(companyConstants.MultiplicationTime) * time.Second
 	isBroken := false
 
-	go func() {
-		if !isBroken {
-			if rand.Float32() > companyConstants.MachineReliability {
-				isBroken = true
-			}
-		}
-	}()
-
 	for {
 		select {
 		case insertedTask := <-machine.taskInsertChan:
 			time.Sleep(sleepTime)
+			if !isBroken {
+				if rand.Float32() > companyConstants.MachineReliability {
+					isBroken = true
+				}
+			}
 			insertedTask.task = insertedTask.task.solve(isBroken)
 			insertedTask.solvedChan <- insertedTask.task
 		case <-machine.backDoor:
-			fmt.Println("Machine #", machine.id, "is being repaired")
 			isBroken = false
 		}
 	}

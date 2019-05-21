@@ -15,7 +15,7 @@ const MultiplicationMachinesCount = 4
 const AdditionMachinesCount = 4
 const MultiplicationTime = 10
 const AdditionTime = 8
-const MachineReliability = 0.3
+const MachineReliability = 0.5
 
 const AccessTime = 5
 const ServiceWorkersCount = 3 // < AdditionMachinesCount + MultiplicationMachinesCount

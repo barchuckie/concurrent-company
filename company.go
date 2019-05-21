@@ -29,7 +29,7 @@ func main() {
 	magazineInfoChan := make(chan bool)
 
 	brokenMachinesChan := make(chan int)
-	repairedMachinesChan := make(chan int)
+
 	machines := make([]machine, 0, companyConstants.AdditionMachinesCount+companyConstants.MultiplicationMachinesCount)
 
 	for i := range additionMachines {
@@ -39,11 +39,7 @@ func main() {
 		machines = append(machines, multiplicationMachines[i])
 	}
 
-	serviceWorkers := createServiceWorkers()
-	for i := range serviceWorkers {
-		go serviceWorkers[i].work(machines, repairedMachinesChan, isInteractive)
-	}
-	go service(brokenMachinesChan, repairedMachinesChan, serviceWorkers, isInteractive)
+	go service(brokenMachinesChan, machines, isInteractive)
 
 	workersInfoChan := make([]chan int, 0, companyConstants.WorkersCount)
 

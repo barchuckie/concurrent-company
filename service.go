@@ -6,8 +6,13 @@ import (
 	"time"
 )
 
-func service(brokenMachineChan chan int, repairedMachineChan chan int,
-	workers []serviceWorker, isInteractive bool) {
+func service(brokenMachineChan chan int, machines []machine, isInteractive bool) {
+	repairedMachinesChan := make(chan int)
+
+	serviceWorkers := createServiceWorkers()
+	for i := range serviceWorkers {
+		go serviceWorkers[i].work(machines, repairedMachinesChan, isInteractive)
+	}
 
 	brokenMachines := make([]int, 0, companyConstants.AdditionMachinesCount+companyConstants.AdditionMachinesCount)
 	workingMachines := make([]bool, companyConstants.AdditionMachinesCount+companyConstants.AdditionMachinesCount)
@@ -22,7 +27,6 @@ func service(brokenMachineChan chan int, repairedMachineChan chan int,
 			if !isInteractive {
 				fmt.Println("Service receives report about broken machine #", brokenMachine)
 			}
-			workingMachines[brokenMachine] = false
 			add := true
 			for i := range brokenMachines {
 				if brokenMachines[i] == brokenMachine {
@@ -30,24 +34,25 @@ func service(brokenMachineChan chan int, repairedMachineChan chan int,
 					break
 				}
 			}
-			if add && !workingMachines[brokenMachine] {
+			if add && workingMachines[brokenMachine] {
 				brokenMachines = append(brokenMachines, brokenMachine)
 			}
-		case repairedMachine := <-repairedMachineChan:
+		case repairedMachine := <-repairedMachinesChan:
 			if !isInteractive {
 				fmt.Println("Service repaired machine #", repairedMachine)
 			}
 			workingMachines[repairedMachine] = true
 		default:
-			for i := range workers {
+			for i := range serviceWorkers {
 				if len(brokenMachines) == 0 {
 					break
 				}
 				select {
-				case workers[i].brokenMachineId <- brokenMachines[0]:
+				case serviceWorkers[i].brokenMachineId <- brokenMachines[0]:
 					if !isInteractive {
 						fmt.Println("Service sends worker #", i, "to broken machine #", brokenMachines[0])
 					}
+					workingMachines[brokenMachines[0]] = false
 					brokenMachines = append(brokenMachines[:0], brokenMachines[1:]...)
 					break
 				default:
@@ -61,14 +66,12 @@ func service(brokenMachineChan chan int, repairedMachineChan chan int,
 type serviceWorker struct {
 	id              int
 	brokenMachineId chan int
-	isBusy          bool
 }
 
 func (sw serviceWorker) work(machines []machine, repairedMachineChan chan<- int, isInteractive bool) {
 
 	for {
 		brokenMachine := <-sw.brokenMachineId
-		sw.isBusy = true
 		if !isInteractive {
 			fmt.Println("Service Worker #", sw.id, "starts repairing machine #", brokenMachine)
 		}
@@ -76,7 +79,6 @@ func (sw serviceWorker) work(machines []machine, repairedMachineChan chan<- int,
 		time.Sleep(companyConstants.AccessTime * time.Second)
 		backDoor <- true
 		repairedMachineChan <- brokenMachine
-		sw.isBusy = false
 	}
 
 }
@@ -88,7 +90,6 @@ func createServiceWorkers() []serviceWorker {
 		sw := serviceWorker{
 			id:              i,
 			brokenMachineId: make(chan int),
-			isBusy:          false,
 		}
 		serviceWorkers = append(serviceWorkers, sw)
 	}
